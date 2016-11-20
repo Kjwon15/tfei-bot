@@ -15,5 +15,5 @@ logging.basicConfig(
 logger = logging.getLogger(telegram_bot.__name__)
 logger.setLevel(logging.INFO)
 
-telegram_bot.start_bot(TELEGRAM_TOKEN, DB_URI, THRESHOLD,
+telegram_bot.start_bot(TELEGRAM_TOKEN, DB_URI, float(THRESHOLD),
           learning=True, answering=True)
