@@ -7,6 +7,7 @@ This module provides abillities to connect to telegram.
 """
 from __future__ import unicode_literals
 
+import logging
 import re
 
 from six.moves import urllib
@@ -17,7 +18,6 @@ from telegram.ext import (
 from sysinfo import getsysinfo
 
 from autotweet.learning import DataCollection, NoAnswerError
-from autotweet.logger_factory import get_logger
 from autotweet.twitter import strip_tweet
 
 
@@ -27,7 +27,7 @@ class ReplyFilter(BaseFilter):
 
 Filters.reply = ReplyFilter()
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class TelegramBot(object):
