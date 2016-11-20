@@ -14,6 +14,7 @@ from six.moves import urllib
 
 from telegram.ext import (
     BaseFilter, CommandHandler, Filters, MessageHandler, Updater)
+from telegram.ext.dispatcher import run_async
 
 from sysinfo import getsysinfo
 
@@ -24,6 +25,7 @@ from autotweet.twitter import strip_tweet
 class ReplyFilter(BaseFilter):
     def filter(self, message):
         return bool(message.reply_to_message)
+
 
 Filters.reply = ReplyFilter()
 
@@ -50,11 +52,13 @@ class TelegramBot(object):
         self.updater.start_polling()
         self.updater.idle()
 
+    @run_async
     def learning_handler(self, bot, update):
         question = strip_tweet(update.message.reply_to_message.text)
         answer = strip_tweet(update.message.text, remove_url=False)
         self.data_collection.add_document(question, answer)
 
+    @run_async
     def answering_handler(self, bot, update):
         question = strip_tweet(update.message.text)
         try:
@@ -72,11 +76,13 @@ class TelegramBot(object):
         logger.info('Leave from chat {}'.format(update.message.chat_id))
         bot.leave_chat(update.message.chat_id)
 
+    @run_async
     def sysinfo_handler(self, bot, update):
         update.message.reply_text(
             '```text\n{}\n```'.format(getsysinfo()),
             parse_mode='Markdown')
 
+    @run_async
     def photo_handler(self, bot, update):
         logger.info('Taking photo.')
         req = urllib.request.urlopen('http://localhost:8080/photoaf.jpg')
