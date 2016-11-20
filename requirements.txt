@@ -1,0 +1,4 @@
+autotweet>=0.4.1
+python-telegram-bot>=5.2.0
+sysinfo>=1.0.0
+six>=1.10.0
