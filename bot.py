@@ -2,6 +2,7 @@ import logging
 import os
 
 import telegram_bot
+from autotweet import logger_factory
 
 DB_URI = os.getenv('DATABASE_URL')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -13,8 +14,10 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(telegram_bot.__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
+logger_factory.set_level(logging.DEBUG)
 
+logger.info('Starting telegram bot...')
 telegram_bot.start_bot(
     TELEGRAM_TOKEN, DB_URI, float(THRESHOLD),
-    learning=True, answering=True)
+    learning=False, answering=True)

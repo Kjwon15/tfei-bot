@@ -7,8 +7,16 @@ This module provides abillities to connect to telegram.
 """
 from __future__ import unicode_literals
 
+from datetime import timedelta
 import logging
+import os
+import random
 import re
+import time
+
+from pprint import pprint
+
+import psutil
 
 from six.moves import urllib
 
@@ -20,6 +28,17 @@ from sysinfo import getsysinfo
 
 from autotweet.learning import DataCollection, NoAnswerError
 from autotweet.twitter import strip_tweet
+
+
+INTERVAL = 60
+CPU_THRESHOLD = 2.0
+SECONDS = timedelta(days=1).total_seconds()
+
+
+try:
+    ADMIN_ID = int(os.getenv('ADMIN_ID'))
+except TypeError:
+    ADMIN_ID = None
 
 
 class ReplyFilter(BaseFilter):
@@ -49,8 +68,29 @@ class TelegramBot(object):
         logger.info('Starting with {} documents.'.format(
             self.data_collection.get_count()))
         self.me = self.updater.bot.get_me()
+        if ADMIN_ID:
+            logger.info('Sending message to admin')
+            self.updater.bot.send_message(
+                chat_id=ADMIN_ID,
+                text="I'm starting!"
+            )
+            self._update_last_activity()
+        else:
+            logger.info('Admin is not set')
         self.updater.start_polling()
-        self.updater.idle()
+        while True:
+            try:
+                time.sleep(INTERVAL)
+                if self._is_over_threshold():
+                    logger.info('Sending message')
+                    self.updater.bot.send_message(
+                        chat_id=ADMIN_ID,
+                        text="Yo!"
+                    )
+                    self._update_last_activity()
+            except KeyboardInterrupt:
+                break
+        # self.updater.idle()
 
     @run_async
     def learning_handler(self, bot, update):
@@ -67,10 +107,12 @@ class TelegramBot(object):
                     self._is_necessary_to_reply(bot, update)):
                 logger.info('{} -> {}'.format(question, answer))
                 update.message.reply_text(answer)
+                self._update_last_activity()
         except NoAnswerError:
             logger.debug('No answer to {}'.format(update.message.text))
             if self._is_necessary_to_reply(bot, update):
                 update.message.reply_text(r'¯\_(ツ)_/¯')
+                self._update_last_activity()
 
     def leave_handler(self, bot, update):
         logger.info('Leave from chat {}'.format(update.message.chat_id))
@@ -81,13 +123,30 @@ class TelegramBot(object):
         update.message.reply_text(
             '```text\n{}\n```'.format(getsysinfo()),
             parse_mode='Markdown')
+        self._update_last_activity()
 
     @run_async
     def photo_handler(self, bot, update):
         logger.info('Taking photo.')
-        req = urllib.request.urlopen('http://localhost:8080/photoaf.jpg')
-        update.message.reply_photo(
-            photo=req)
+        self._update_last_activity()
+        try:
+            req = urllib.request.urlopen('http://localhost:8080/photoaf.jpg')
+        except:
+            update.message.reply_text(
+                'Unable to get photo'
+            )
+        else:
+            update.message.reply_photo(
+                photo=req)
+
+    def debug_handler(self, bot, update):
+        logger.info('Debugging')
+        user = update.message.from_user
+        pprint({
+            'username': user.username,
+            'id': user.id,
+            'chat_id': update.message.chat_id,
+        })
 
     def enable_learning(self):
         logger.debug('Enabling learning handler.')
@@ -99,6 +158,23 @@ class TelegramBot(object):
         self.dispatcher.add_handler(
             MessageHandler(Filters.text, self.answering_handler))
 
+    def _is_over_threshold(self):
+        if not hasattr(self, 'last_activity'):
+            self._update_last_activity()
+
+        percent = psutil.cpu_percent()
+        delta = time.time() - self.last_activity
+
+        threshold = SECONDS / delta * percent / CPU_THRESHOLD
+        logger.debug('CPU: {}, delta: {}, threshold: {}'.format(
+            percent, delta, threshold))
+        value = random.gauss(1.0, 0.1)
+
+        return value > threshold
+
+    def _update_last_activity(self):
+        self.last_activity = time.time()
+
     def _make_updater(self, token):
         self.updater = Updater(token)
         self.dispatcher = self.updater.dispatcher
@@ -108,6 +184,7 @@ class TelegramBot(object):
         self.dispatcher.add_handler(
             CommandHandler('sysinfo', self.sysinfo_handler))
         self.dispatcher.add_handler(CommandHandler('photo', self.photo_handler))
+        self.dispatcher.add_handler(CommandHandler('debug', self.debug_handler))
 
     def _is_necessary_to_reply(self, bot, update):
         message = update.message
